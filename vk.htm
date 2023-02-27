@@ -18,14 +18,15 @@
 <script>
 
 //'VK authentication constants
-var ClientId = "5621112";
-var RedirectUri = "https://oauth.vk.com/blank.html";
-var AuthUri = "https://oauth.vk.com/authorize?client_id=" + ClientId + "&redirect_uri=" + 
-		RedirectUri + "&response_type=token&scope=wall,docs";
+var clientId = "51567456";
+var redirectUri = window.location.href;
+var authUri = "https://oauth.vk.com/authorize?client_id=" + clientId + "&redirect_uri=" + 
+		redirectUri + "&response_type=token&scope=wall,docs&display=popup";
 
 var uploadUrl;
+window.open(authUri);
 
-var authUrl="https://vk.com/away.php?to=https://oauth.vk.com/authorize";
+alert(window.location.search);
 
 //vkapi authentication html js
 //get files from drop
