@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	
+	<title>Загрузчик документов в vk.</title>
+	<style>
+		#drop_zone {
+  border: 5px solid blue;
+  width: 200px;
+  height: 100px;
+}
+	</style>
+</head>
+
+<script src="..\includes\include.js"></script>
+
+<script>
+
+//'VK authentication constants
+var ClientId = "5621112";
+var RedirectUri = "https://oauth.vk.com/blank.html";
+var AuthUri = "https://oauth.vk.com/authorize?client_id=" + ClientId + "&redirect_uri=" + 
+		RedirectUri + "&response_type=token&scope=wall,docs";
+
+var uploadUrl;
+
+var authUrl="https://vk.com/away.php?to=https://oauth.vk.com/authorize";
+
+//vkapi authentication html js
+//get files from drop
+//upload
+//filelist
+
+//εσυ δυστυχώς δεν έχεις καλή διάκριση πολλές φορές και
+//έχεις λάθη στόν νού.
+
+//Желательно: прохождение по всем документам, проверка, есть ли такой вконтакте,
+//доступен ли для загрузки без регистрации, и если нет, то - загрузить.
+
+//о загрузке в поддеркжу, как сделать документы доступными...
+
+//uploadUrl= VKMethod("docs.getUploadServer").upload_url;
+	
+	function dropHandler(ev) {
+  console.log('File(s) dropped');
+
+  // Prevent default behavior (Prevent file from being opened)
+  ev.preventDefault();
+
+  if (ev.dataTransfer.items) {
+    // Use DataTransferItemList interface to access the file(s)
+    [...ev.dataTransfer.items].forEach((item, i) => {
+      // If dropped items aren't files, reject them
+      if (item.kind === 'file') {
+        const file = item.getAsFile();
+        console.log(file);
+      }
+    });
+  } else {
+    // Use DataTransfer interface to access the file(s)
+    [...ev.dataTransfer.files].forEach((file, i) => {
+      console.log(file);
+    });
+  }
+}
+
+function dragOverHandler(ev) {
+  console.log('File(s) in drop zone');
+
+  // Prevent default behavior (Prevent file from being opened)
+  ev.preventDefault();
+}
+
+//var uplPath, tags;
+function OnClickButtonUpload()
+{
+	if(txtTags.value!=tags) {
+		tags=txtTags.value;
+		SaveSetting("tags", '',tags);
+ 	}
+ 	 	
+ 	if(typeof uplPath=="undefined")
+ 		var folder=OnClickBrowse();
+ 	else	
+		var folder = shapp.namespace(uplPath);
+	
+	if (folder) UploadFolder (folder, tags);
+}
+
+function DocumentOnline(fItem)
+{
+	return false;
+}
+
+
+
+//Upload a document to vk
+var counter=0, attachments='';
+var uploadQueue=[];
+
+function UploadDocument(doc, tags)
+{	
+	if (doc.Size>=200*1024*1024) NextUpload();
+
+	var docTitle = (doc.Name);
+//	docTitle = SeriesReplace(docTitle, ["'", "", "!", ""]);
+	
+	if (xmlhttp.readyState!=READYSTATE_UNINITIALIZED && xmlhttp.readyState!=READYSTATE_COMPLETE) {
+		//another upload in progress.
+		uploadQueue.push ({doc:doc, tags:tags});
+		return;
+	}
+	
+	//Build multipart/form-data document
+	var content=newdict();
+	content("file")=doc;
+	var formData=BuildFormData(content);
+ 	if (formData==null)
+    	return NextUpload();
+    
+   	echo (doc.Path);
+
+	xmlhttp.open ("POST", uploadUrl, true);
+    //.setRequestHeader "User-Agent", userAgent
+    xmlhttp.setRequestHeader ("Content-Type", "multipart/form-data; boundary=" + MPFDBoundary);
+    	
+    xmlhttp.onreadystatechange = function () {
+ 		if (xmlhttp.readyState != READYSTATE_COMPLETE) return;
+			
+		resp=JSON.parse(xmlhttp.responseText);
+		
+		if ("error" in resp)
+			echo (JSON.stringify(resp));
+		else {
+				
+			var resp = VKMethod("docs.save", "file=" + resp.file + "&title=" + docTitle + "&tags=" + tags);
+					
+			if("doc" in resp) {
+				docId = resp.doc.id;
+				
+				attachments = attachments + "doc" + "13940194_" + docId + ",";
+				counter = counter + 1;
+				
+				if( counter == 10) Publish();
+				
+			} else
+				echo (JSON.stringify(resp));
+		}
+		
+		// delay (333) may be needed. vk has limits
+		NextUpload();
+	}
+    	   
+  	xmlhttp.send (formData);
+}
+
+function upload(){
+
+  const fd = new FormData();
+
+  // add all selected files
+  e.target.files.forEach((file) => {
+    fd.append(e.target.name, file, file.name);  
+  });
+  
+  // create the request
+  const xhr = new XMLHttpRequest();
+  xhr.onload = () => {
+    if (xhr.status >= 200 && xhr.status < 300) {
+        // we done!
+    }
+  };
+  
+  // path to server would be where you'd normally post the form to
+  xhr.open('POST', '/path/to/server', true);
+  xhr.send(fd);
+}
+
+function uploadFile(form){
+     const formData = new FormData(form);
+     var oOutput = document.getElementById("static_file_response")
+     var oReq = new XMLHttpRequest();
+         oReq.open("POST", "upload_static_file", true);
+     oReq.onload = function(oEvent) {
+         if (oReq.status == 200) {
+           oOutput.innerHTML = "Uploaded!";
+           console.log(oReq.response)
+         } else {
+           oOutput.innerHTML = "Error occurred when trying to upload your file.<br \/>";
+         }
+         };
+     oOutput.innerHTML = "Sending file!";
+     console.log("Sending file!")
+     oReq.send(formData);
+    }
+
+function NextUpload()
+{
+	if (uploadQueue.length) {
+		var doc=uploadQueue.shift();
+		UploadDocument(doc.doc, doc.tags);
+	} else if (counter>0) Publish();
+}
+
+function Publish()
+{	
+	var resp = VKMethod("wall.post","attachments=" + attachments)
+	
+	//echo(JSON.stringify(resp));
+	counter = 0;
+	attachments = "";
+
+}
+
+
+function VKMethod(method, args) {
+	
+	var addr = "https://api.vk.com/method/" + method + "?access_token=" + GetAccessToken() + "&" +args;
+				  
+	var resp = JSON.parse(httpGet(addr));
+   	
+	if ("response" in resp) return resp.response;
+    
+    var errcode = resp.error.error_code;
+     	
+   	switch(errcode)
+   	{
+   		case 5:
+   			//W.Echo "Authentication code needs to be updated"
+  
+   			var at=RenewAccessToken();
+   			if (typeof at!="undefined")
+   				return VKMethod(method, args);
+   			else {
+   				throw "Без доступа к методам программа ничего не может совершить.";
+   				return;
+   			}
+   			
+   		case 14:	//captcha 			
+ 			captcha_img = resp.error.captcha_img;
+ 			captcha_sid = resp.error.captcha_sid;
+ 			
+   			wShell.Run (captcha_img);
+   			captcha_key = prompt("Captcha requested.");
+   			
+   			if (captcha_key==null) throw("Cannot proceed without captcha.");
+   			
+   			args = args + "&captcha_key=" +captcha_key+ "&captcha_sid="+captcha_sid;
+   			return VKMethod(method, args);
+   			
+   		default:
+   			echo("VKMethod",method,"error",errcode); 
+   			return resp.error;			
+ 	}
+ 	
+}
+
+
+var attachments, counter
+
+
+function GetAccessToken()
+{
+	if (!accessToken)
+	{
+		accessToken = RenewAccessToken()
+		//SaveSetting "accessToken", ,accessToken 
+	}
+	
+	GetAccessToken = accessToken
+}
+
+function RenewAccessToken()
+{
+	//'navigate browser to AuthUri
+	window.open(AuthUri);
+		
+	accessToken = InputBox("Введите access token (тоукен доступа)")
+	if (accessToken) //SaveSetting "accessToken", ,accessToken
+		
+	return accessToken
+}
+
+/*
+uploadExtensions="pdf djvu doc docx zip rar"
+Sub UploadFolder(folder, tags)
+	For Each fItem In folder.Items
+		if  (fItem.IsFolder) then
+			'UploadFolder fItem, tags
+		
+		elseif (fItem.IsLink) then
+			'follow the link and see
+			
+		elseif instr(uploadExtensions, fso.GetExtensionName(fItem.Name)) then
+			if DocumentOnline(fItem) then
+				'CopyDocument ...
+			else
+				UploadDocument fItem, tags
+			end if
+		end if	
+	Next
+End Sub
+
+
+
+'
+'docs download
+
+Const illicitFilenameChars = "/ \ * ? "" < > | :"
+Set wantedTypes = CreateObject ("Scripting.dictionary")
+
+
+
+Sub SearchDocsByFolder (folder)
+
+'	For Each subFolder In folder.SubFolders
+'		SearchDocsByFolder subFolder
+'	Next	
+
+	For Each fayl In folder.Items
+		If fso.GetExtensionName(fayl.Name) = "xml" Then
+			'hasXmlFiles = True
+			Exit For
+		End if
+	Next		
+
+	If Not hasXmlFiles Then
+		Set docs = SearchDocsByQuery (folder, folder.Title)
+		
+		If (docs.length = 0) Then
+			'If folder.Items.Count = 0 Then folder.Delete
+		Elseif (docs.length >= 1000) Then
+			For Each wantedType In wantedTypes.Items()
+				SearchDocsByQuery folder, folder.Title & " " & wantedType
+			Next
+		End if	
+	End If
+End Sub
+
+function SearchDocsByQuery(folder, q)
+	
+	Set docs = vkmethod("docs.search", "count=1001&q=" + q)
+	
+	'check for error
+	If docs.getElementsByTagName("error").length > 0 Then
+		echo docs.xml
+	
+	End If
+	
+	docsCount = docs.selectSingleNode("/response/count").text
+	
+	Set docs = docs.getElementsByTagName("doc")
+	echo "Count reported/returned " & docsCount & "/" & docs.length
+	
+	Set SearchDocsByQuery = docs
+
+	For Each doc In docs
+		'w.stdout.write "."		
+		
+		docId = doc.selectSingleNode("id").text
+		docSize = CLng(doc.selectSingleNode("size").text)
+		docTitle = fso.GetBaseName(Trim(doc.selectSingleNode("title").text))
+		docType = doc.selectSingleNode("type").text	
+		docExt = doc.selectSingleNode("ext").text	
+			
+		'titleWords = Split(docTitle, " ")
+		
+		For Each char In Split(illicitFileNameChars, " ")  
+	    	docTitle = (Replace(docTitle, char, ""))
+	    Next
+	    	   	
+		xmlFilename = fso.buildPath(folder.Path, docTitle  & "." & docExt & ".xml")		
+		'altXmlFilename = fso.BuildPath(folder.Path, docId & "." & docExt & ".xml")
+		docDownloadLoc = fso.BuildPath (folder.Path, docTitle & "." & docExt)
+		
+		echo xmlFilename, docDownloadLoc
+		
+		If fso.FileExists(docDownloadLoc) Then
+				
+			sizeOffline = fso.GetFile(docDownloadLoc).Size
+			sizeOnline = docSize
+			If (sizeOffline = sizeOnline) Then
+				If fso.FileExists(xmlFilename) Then fso.DeleteFile(xmlFilename)
+			Else
+				fso.CreateTextFile(xmlFilename, True, True).Write doc.xml
+			End If
+						
+		Else
+			fso.CreateTextFile(xmlFilename, True, True).Write doc.xml
+		
+		End If
+		
+		If Not wantedTypes.Exists(docExt) Then
+			wantedTypes.Add docExt, docExt
+		End if
+
+	Next		
+End function
+
+'
+' Gloria in excelsis Dei, et in terra pax, hominibus bonae voluntatis.
+'
+
+
+Sub DownloadByFolder(folder)
+	
+	For Each fayl In folder.Files
+		If fso.GetExtensionName(fayl.Name) = "xml" Then
+			Set xmlFile = fayl
+			Set doc=xml
+			doc.load xmlFile.Path
+			If doc.parseError.errorCode = 0 Then
+			
+				docOwnerId = doc.selectSingleNode("//doc/owner_id").text
+				docUrl = doc.selectSingleNode("//doc/url").text
+				docTitle = fso.GetBaseName(Trim(doc.selectSingleNode("//doc/title").text))
+				
+				docTitle = removechars(docTitle, """?/:|")				
+				
+				docExt = doc.selectSingleNode("//doc/ext").text
+				docDownloadLoc = fso.BuildPath (folder.Path, docTitle & "." & docExt)
+				docSize = CLng(doc.selectSingleNode("//doc/size").text)
+				docId = CLng(doc.selectSingleNode("//doc/id").text)
+			
+				isOffline = fso.FileExists(docDownloadLoc)
+				
+				If isOffline Then sizeOffline = fso.GetFile(docDownloadLoc).Size
+				
+				If isOffline And (sizeOffline = docSize) Then
+		
+					xmlFile.delete
+								
+				Else
+					
+					'check if the user is ok, not blocked or deleted.
+					Set userInfo = vkmethod("users.get", "user_ids=" & docOwnerId)
+					
+					If userInfo.getElementsByTagName("deactivated").length = 1 Then
+						'User problem with this document (deleted page or banned), won't download by url.
+						'In this case we add the document to my page and download from there.
+						echo "User problem. Consider manually adding document to your page.", docTitle
+						
+					Else
+									
+						DownloadFile docUrl, docDownloadLoc
+						
+					End If
+				
+				End If
+					
+				
+			Else
+				echo "Error parsing " & xmlFile.Name
+				With doc.parseError
+					echo .reason
+					echo .srcText
+				End with									
+					
+			End If
+		End if
+	Next
+	
+	For Each subFolder In folder.SubFolders
+		DownloadByFolder subFolder
+	Next
+End Sub
+
+
+Sub OnClickButtonSearch()
+  'This method will be called when button "btnUpload" is clicked
+  'Add your code here
+ 
+ 	Set folder=shApp.BrowseForFolder(0, "Укажите папку", 0, "c:\users\luda\downloads\vksearch")
+ 	SearchDocsByFolder folder
+ 	
+End Sub
+
+
+Sub OnClickButtonDownload()
+  'This method will be called when button "btnUpload" is clicked
+  'Add your code here
+  DownloadByFolder fso.GetFolder(fso.BuildPath(downloadsPath, "vksearch\Козаржевский"))
+End Sub
+
+	*/
+
+</script>
+
+
+<body>
+
+	<p>
+	Метки: <input type="text" name="txtTags" id="txtTags" size=110>
+	<p>Запрос: <input type="text" name="txtQuery" id="txtQuery" size=110>
+	<p>
+	<input type="button" name="btnUpload" id="btnUpload" value="Загрузить" onclick="OnClickButtonUpload()">
+	
+	<div
+  id="drop_zone"
+  ondrop="dropHandler(event);"
+  ondragover="dragOverHandler(event);">
+  <p>Drag one or more files to this <i>drop zone</i>.</p>
+</div>
+
+	<button id=btnLabel onclick="OnClickLabel()">Проставить метки по рег.выр. запросу</button>
+	<input type="button" name="btnDownload" id="btnDownload" value="Скачать" onclick="OnClickButtonDownload()">
+	<input type="button" name="btnSearch" id="btnSearch" value="Поиск" onclick="OnClickButtonSearch()">
+	<p>
+	Папка: <span id=lblFolder><span>
+
+</body>
+</html>
