@@ -5,29 +5,61 @@
 	
 	<title>Загрузчик документов в vk.</title>
 	<style>
-		#drop_zone {
-  border: 5px solid blue;
-  width: 200px;
-  height: 100px;
-}
+		#dropzone {
+			border: 5px solid blue;
+			width: 200px;
+			height: 100px;
+			}
 	</style>
 </head>
 
-<script src="..\includes\include.js"></script>
+<script src=".\include.js"></script>
+<body>
 
+		<p>
+		Метки: <input type="text" name="txtTags" id="txtTags" size=110>
+		<p>Запрос: <input type="text" name="txtQuery" id="txtQuery" size=110>
+		<p>
+		<input type="button" name="btnUpload" id="btnUpload" value="Загрузить" onclick="OnClickButtonUpload()">
+		
+		<div
+	  id="dropzone"
+	  >
+	  <p>Drag one or more files to this <i>drop zone</i>.</p>
+	</div>
+	<ul id="listing"></ul>
+	
+		<button id=btnLabel onclick="OnClickLabel()">Проставить метки по рег.выр. запросу</button>
+		<input type="button" name="btnDownload" id="btnDownload" value="Скачать" onclick="OnClickButtonDownload()">
+		<input type="button" name="btnSearch" id="btnSearch" value="Поиск" onclick="OnClickButtonSearch()">
+		<p>
+		Папка: <span id=lblFolder><span>
+	
+	
 <script>
 
 //'VK authentication constants
-var ClientId = "5621112";
-var RedirectUri = "https://oauth.vk.com/blank.html";
-var AuthUri = "https://oauth.vk.com/authorize?client_id=" + ClientId + "&redirect_uri=" + 
-		RedirectUri + "&response_type=token&scope=wall,docs";
+var clientId = "51567456";
+var redirectUri = window.location.href;
+var authUri = "https://oauth.vk.com/authorize?client_id=" + clientId + "&redirect_uri=" + 
+		redirectUri + "&response_type=token&scope=wall,docs";
 
 var uploadUrl;
 
-var authUrl="https://vk.com/away.php?to=https://oauth.vk.com/authorize";
+var accessToken=localStorage.getItem("accessToken")
+if (!accessToken)
+{
+	let params = new URLSearchParams(document.location.search);
+	let accessToken = params.get("accessToken");
+	if (accessToken)
+		localStorage.setItem("accessToken", accessToken);
+	else
+		window.open(authUri);
+		"ok"
+}
+//alert(accessToken);
 
-//vkapi authentication html js
+//Завтра еникио
 //get files from drop
 //upload
 //filelist
@@ -41,36 +73,66 @@ var authUrl="https://vk.com/away.php?to=https://oauth.vk.com/authorize";
 //о загрузке в поддеркжу, как сделать документы доступными...
 
 //uploadUrl= VKMethod("docs.getUploadServer").upload_url;
-	
-	function dropHandler(ev) {
-  console.log('File(s) dropped');
+let dropzone = document.getElementById("dropzone");
+let listing = document.getElementById("listing");
 
-  // Prevent default behavior (Prevent file from being opened)
-  ev.preventDefault();
+function scanFiles(item, container) {
+  let elem = document.createElement("li");
+  elem.textContent = item.name;
+  container.appendChild(elem);
 
-  if (ev.dataTransfer.items) {
-    // Use DataTransferItemList interface to access the file(s)
-    [...ev.dataTransfer.items].forEach((item, i) => {
-      // If dropped items aren't files, reject them
-      if (item.kind === 'file') {
-        const file = item.getAsFile();
-        console.log(file);
-      }
-    });
-  } else {
-    // Use DataTransfer interface to access the file(s)
-    [...ev.dataTransfer.files].forEach((file, i) => {
-      console.log(file);
+  alert(item);
+
+  if (item.isDirectory) {
+    let directoryReader = item.createReader();
+    let directoryContainer = document.createElement("ul");
+    container.appendChild(directoryContainer);
+    directoryReader.readEntries((entries) => {
+      entries.forEach((entry) => {
+        scanFiles(entry, directoryContainer);
+      });
     });
   }
 }
+/*
+Copy to Clipboard
+scanFiles() begins by creating a new <li> element to represent the item being scanned, inserts the name of the item into it as its text content, and then appends it to the container. The container is always a list element in this example, as you'll see shortly.
 
-function dragOverHandler(ev) {
-  console.log('File(s) in drop zone');
+Once the current item is in the list, the item's isDirectory property is checked. If the item is a directory, we need to recurse into that directory. The first step is to create a FileSystemDirectoryReader to handle fetching the directory's contents. That's done by calling the item's createReader() method. Then a new <ul> is created and appended to the parent list; this will contain the directory's contents in the next level down in the list's hierarchy.
 
-  // Prevent default behavior (Prevent file from being opened)
-  ev.preventDefault();
-}
+After that, directoryReader.readEntries() is called to read in all the entries in the directory. These are each, in turn, passed into a recursive call to scanFiles() to process them. Any of them which are files are inserted into the list; any which are directories are inserted into the list and a new level of the list's hierarchy is added below, and so forth.
+
+Then come the event handlers. First, we prevent the dragover event from being handled by the default handler, so that our drop zone can receive the drop:
+*/
+
+dropzone.addEventListener(
+  "dragover",
+  (event) => {
+    event.preventDefault();
+  },
+  false
+);
+//Copy to Clipboard
+//The event handler that kicks everything off, of course, is the handler for the drop event:
+
+dropzone.addEventListener(
+  "drop",
+  (event) => {
+    let items = event.dataTransfer.items;
+
+    event.preventDefault();
+    listing.textContent = "";
+
+    for (let i = 0; i < items.length; i++) {
+      let item = items[i].webkitGetAsEntry();
+
+      if (item) {
+        scanFiles(item, listing);
+      }
+    }
+  },
+  false
+);
 
 //var uplPath, tags;
 function OnClickButtonUpload()
@@ -417,7 +479,7 @@ Sub DownloadByFolder(folder)
 				docTitle = fso.GetBaseName(Trim(doc.selectSingleNode("//doc/title").text))
 				
 				docTitle = removechars(docTitle, """?/:|")				
-				
+				dragover
 				docExt = doc.selectSingleNode("//doc/ext").text
 				docDownloadLoc = fso.BuildPath (folder.Path, docTitle & "." & docExt)
 				docSize = CLng(doc.selectSingleNode("//doc/size").text)
@@ -486,28 +548,6 @@ End Sub
 	*/
 
 </script>
-
-
-<body>
-
-	<p>
-	Метки: <input type="text" name="txtTags" id="txtTags" size=110>
-	<p>Запрос: <input type="text" name="txtQuery" id="txtQuery" size=110>
-	<p>
-	<input type="button" name="btnUpload" id="btnUpload" value="Загрузить" onclick="OnClickButtonUpload()">
-	
-	<div
-  id="drop_zone"
-  ondrop="dropHandler(event);"
-  ondragover="dragOverHandler(event);">
-  <p>Drag one or more files to this <i>drop zone</i>.</p>
-</div>
-
-	<button id=btnLabel onclick="OnClickLabel()">Проставить метки по рег.выр. запросу</button>
-	<input type="button" name="btnDownload" id="btnDownload" value="Скачать" onclick="OnClickButtonDownload()">
-	<input type="button" name="btnSearch" id="btnSearch" value="Поиск" onclick="OnClickButtonSearch()">
-	<p>
-	Папка: <span id=lblFolder><span>
-
 </body>
+
 </html>
