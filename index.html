@@ -28,6 +28,8 @@
 	  <p>Drag one or more files to this <i>drop zone</i>.</p>
 	</div>
 	<ul id="listing"></ul>
+<input type="file" id="filepicker" name="fileList" webkitdirectory multiple />
+
 	
 		<button id=btnLabel onclick="OnClickLabel()">Проставить метки по рег.выр. запросу</button>
 		<input type="button" name="btnDownload" id="btnDownload" value="Скачать" onclick="OnClickButtonDownload()">
@@ -40,28 +42,35 @@
 
 //'VK authentication constants
 var clientId = "51567456";
-var redirectUri = window.location.href;
+var redirectUri = "https://hermolaou.github.io"; //window.location.href;
 var authUri = "https://oauth.vk.com/authorize?client_id=" + clientId + "&redirect_uri=" + 
 		redirectUri + "&response_type=token&scope=wall,docs";
 
-var uploadUrl;
-
-var accessToken=localStorage.getItem("accessToken")
+var userId,
+	accessToken=localStorage.getItem("accessToken")
 if (!accessToken)
 {
 	let params = new URLSearchParams(document.location.search);
 	let accessToken = params.get("accessToken");
-	if (accessToken)
+	userId = params.get("user_id");
+
+	if (accessToken){
 		localStorage.setItem("accessToken", accessToken);
+		localStorage.setItem("userId", userId);
+
+		window.location.href="file:///D:/scripts/vk/index.html?accessToken=" +
+			accessToken + "&userId="+userId ;
+	}
 	else
-		window.open(authUri);
+		window.location.href=(authUri);
 		"ok"
 }
-//alert(accessToken);
+alert(accessToken);
+userId=localStorage.getItem("userId")
 
-//Завтра еникио
-//get files from drop
-//upload
+const uploadUrl= VKMethod("docs.getUploadServer").upload_url;
+
+
 //filelist
 
 //εσυ δυστυχώς δεν έχεις καλή διάκριση πολλές φορές και
@@ -72,7 +81,63 @@ if (!accessToken)
 
 //о загрузке в поддеркжу, как сделать документы доступными...
 
-//uploadUrl= VKMethod("docs.getUploadServer").upload_url;
+document.getElementById("filepicker").addEventListener("change", (event) => {
+  let output = document.getElementById("listing");
+  for (const file of event.target.files) {
+    let item = document.createElement("li");
+    item.textContent = file.webkitRelativePath;
+    output.appendChild(item);
+	
+  };
+  upload(event)
+}, false);
+
+
+function upload(e){
+
+	const fd = new FormData();
+
+	// add all selected files
+	e.target.files.forEach((file) => {
+		fd.append(e.target.name, file, file.name);  
+	});
+
+	// create the request
+	const xhr = new XMLHttpRequest();
+	xhr.onload = () => {
+		if (xhr.status >= 200 && xhr.status < 300) {
+			// we done!
+			resp=JSON.parse(xmlhttp.responseText);
+		
+			if ("error" in resp)
+				alert (JSON.stringify(resp));
+			else {
+				const docTitle="some title";
+				const tags="some tags"
+				var resp = VKMethod("docs.save", "file=" + resp.file + "&title=" + docTitle + "&tags=" + tags);
+						
+				if("doc" in resp) {
+					docId = resp.doc.id;
+					
+					attachments = attachments + "doc" + userId+"_" + docId + ",";
+					counter ++;
+					
+					if( counter == 10) Publish();
+					
+				} else
+					alert (JSON.stringify(resp));
+			}
+		}
+	};
+
+	// path to server would be where you'd normally post the form to
+	xhr.open('POST', uploadUrl, true);
+	xhr.send(fd);
+}
+
+
+
+
 let dropzone = document.getElementById("dropzone");
 let listing = document.getElementById("listing");
 
@@ -156,89 +221,7 @@ function DocumentOnline(fItem)
 }
 
 
-
-//Upload a document to vk
-var counter=0, attachments='';
-var uploadQueue=[];
-
-function UploadDocument(doc, tags)
-{	
-	if (doc.Size>=200*1024*1024) NextUpload();
-
-	var docTitle = (doc.Name);
-//	docTitle = SeriesReplace(docTitle, ["'", "", "!", ""]);
-	
-	if (xmlhttp.readyState!=READYSTATE_UNINITIALIZED && xmlhttp.readyState!=READYSTATE_COMPLETE) {
-		//another upload in progress.
-		uploadQueue.push ({doc:doc, tags:tags});
-		return;
-	}
-	
-	//Build multipart/form-data document
-	var content=newdict();
-	content("file")=doc;
-	var formData=BuildFormData(content);
- 	if (formData==null)
-    	return NextUpload();
-    
-   	echo (doc.Path);
-
-	xmlhttp.open ("POST", uploadUrl, true);
-    //.setRequestHeader "User-Agent", userAgent
-    xmlhttp.setRequestHeader ("Content-Type", "multipart/form-data; boundary=" + MPFDBoundary);
-    	
-    xmlhttp.onreadystatechange = function () {
- 		if (xmlhttp.readyState != READYSTATE_COMPLETE) return;
-			
-		resp=JSON.parse(xmlhttp.responseText);
-		
-		if ("error" in resp)
-			echo (JSON.stringify(resp));
-		else {
-				
-			var resp = VKMethod("docs.save", "file=" + resp.file + "&title=" + docTitle + "&tags=" + tags);
-					
-			if("doc" in resp) {
-				docId = resp.doc.id;
-				
-				attachments = attachments + "doc" + "13940194_" + docId + ",";
-				counter = counter + 1;
-				
-				if( counter == 10) Publish();
-				
-			} else
-				echo (JSON.stringify(resp));
-		}
-		
-		// delay (333) may be needed. vk has limits
-		NextUpload();
-	}
-    	   
-  	xmlhttp.send (formData);
-}
-
-function upload(){
-
-  const fd = new FormData();
-
-  // add all selected files
-  e.target.files.forEach((file) => {
-    fd.append(e.target.name, file, file.name);  
-  });
-  
-  // create the request
-  const xhr = new XMLHttpRequest();
-  xhr.onload = () => {
-    if (xhr.status >= 200 && xhr.status < 300) {
-        // we done!
-    }
-  };
-  
-  // path to server would be where you'd normally post the form to
-  xhr.open('POST', '/path/to/server', true);
-  xhr.send(fd);
-}
-
+/*
 function uploadFile(form){
      const formData = new FormData(form);
      var oOutput = document.getElementById("static_file_response")
@@ -256,7 +239,9 @@ function uploadFile(form){
      console.log("Sending file!")
      oReq.send(formData);
     }
+*/
 
+	/*
 function NextUpload()
 {
 	if (uploadQueue.length) {
@@ -264,6 +249,7 @@ function NextUpload()
 		UploadDocument(doc.doc, doc.tags);
 	} else if (counter>0) Publish();
 }
+*/
 
 function Publish()
 {	
