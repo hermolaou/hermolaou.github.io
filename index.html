@@ -11,10 +11,12 @@
 			height: 100px;
 			}
 	</style>
+	<script src="https://vk.com/js/api/openapi.js?169" type="text/javascript"></script>
 </head>
 
 <script src=".\include.js"></script>
 <body>
+
 
 		<p>
 		Метки: <input type="text" name="txtTags" id="txtTags" size=110>
@@ -39,15 +41,30 @@
 	
 	
 <script>
-
 //'VK authentication constants
 var clientId = "51567456";
 var redirectUri = "https://hermolaou.github.io"; //window.location.href;
 var authUri = "https://oauth.vk.com/authorize?client_id=" + clientId + "&redirect_uri=" + 
 		redirectUri + "&response_type=token&scope=wall,docs";
 
-var userId,
+var userId=13940194,
 	accessToken=localStorage.getItem("accessToken")
+	accessToken="vk1.a.I_tyFggoQnKzZGFHkLBBY3_AqD69SiLZsMsc1dRmILvsTbFcjVDRVZ4Zirxoh2sKF_7QMZnxgI6HJfRarp-_i95U9kFbTpc9v2D2oMlqWO2KCA5K8gPqRo46WUXRZ6NsZNvVqXBnhNiyZdCsJwkGPW419GcRG9_Cc43-vyp2V0KS2oaESirR9QZrktRMMUr0u3xMPhRf0886V9kjmb6I1g";
+	localStorage.setItem("userId", userId);
+
+	VK.Auth.login(function(response) {
+  if (response.session) {
+    /* Пользователь успешно авторизовался */
+    if (response.settings) {
+      /* Выбранные настройки доступа пользователя, если они были запрошены */
+		alert('good')
+	}
+  } else {
+    /* Пользователь нажал кнопку Отмена в окне авторизации */
+		alert('cancel')
+  }
+});
+
 if (!accessToken)
 {
 	let params = new URLSearchParams(document.location.search);
@@ -58,17 +75,26 @@ if (!accessToken)
 		localStorage.setItem("accessToken", accessToken);
 		localStorage.setItem("userId", userId);
 
-		window.location.href="file:///D:/scripts/vk/index.html?accessToken=" +
-			accessToken + "&userId="+userId ;
+	//	window.location.href="file:///D:/scripts/vk/index.html?accessToken=" +
+			//accessToken + "&userId="+userId ;
 	}
 	else
-		window.location.href=(authUri);
+		//window.location.href=(authUri);
 		"ok"
 }
-alert(accessToken);
-userId=localStorage.getItem("userId")
 
-const uploadUrl= VKMethod("docs.getUploadServer").upload_url;
+userId=localStorage.getItem("userId")
+VK.Api.call('users.get', {user_ids: 6492, v:"5.73"}, function(r) {
+  if(r.response) {
+    alert('Привет, ' + r.response[0].first_name);
+  }
+});
+
+const uploadUrl=1;
+VK.Api.call("docs.getUploadServer",(r)=>{
+	if(r.response) 
+    alert	(r.response.upload_url);
+})
 
 
 //filelist
@@ -133,8 +159,103 @@ function upload(e){
 	// path to server would be where you'd normally post the form to
 	xhr.open('POST', uploadUrl, true);
 	xhr.send(fd);
+
+		
+	xhr.onerror = function() {
+		alert("Upload request failed");
+	};
 }
 
+async function httpGet(addr){
+	const response = await fetch(addr)
+	return response.json(); // parses JSON response into native JavaScript objects
+}
+
+
+
+function Publish()
+{	
+	var resp = VKMethod("wall.post","attachments=" + attachments)
+	
+	//echo(JSON.stringify(resp));
+	counter = 0;
+	attachments = "";
+
+}
+
+
+function VKMethod(method, args) {
+	
+	if (args==undefined) args="";
+	var addr = "https://api.vk.com/method/?v=5.131&" + method + 
+		"?access_token=" + accessToken +  "&"+args
+		
+				  
+	var resp = httpGet(addr).then((resp)=>{
+		if ("response" in resp) return resp.response;
+		
+		var errcode = resp.error.error_code;
+			
+		switch(errcode)
+		{
+			case 5:
+				//W.Echo "Authentication code needs to be updated"
+	
+				var at=RenewAccessToken();
+				if (typeof at!="undefined")
+					return VKMethod(method, args);
+				else {
+					throw "Без доступа к методам программа ничего не может совершить.";
+					return;
+				}
+				
+			case 14:	//captcha 			
+				captcha_img = resp.error.captcha_img;
+				captcha_sid = resp.error.captcha_sid;
+				
+				alert (captcha_img);
+				captcha_key = prompt("Captcha requested.");
+				
+				if (captcha_key==null) throw("Cannot proceed without captcha.");
+				
+				args = args + "&captcha_key=" +captcha_key+ "&captcha_sid="+captcha_sid;
+				return VKMethod(method, args);
+				
+			default:
+				alert("VKMethod",method,"error",errcode); 
+				return resp.error;			
+		}
+		
+	});
+   	
+	
+}
+
+
+var attachments, counter
+
+
+function GetAccessToken()
+{
+	if (!accessToken)
+	{
+		accessToken = RenewAccessToken()
+		//SaveSetting "accessToken", ,accessToken 
+	}
+	
+	GetAccessToken = accessToken
+}
+
+function RenewAccessToken()
+{
+	//'navigate browser to AuthUri
+	window.open(AuthUri);
+		
+	accessToken = InputBox("Введите access token (тоукен доступа)")
+	if (accessToken) //SaveSetting "accessToken", ,accessToken
+		
+	return accessToken
+}
 
 
 
@@ -250,85 +371,6 @@ function NextUpload()
 	} else if (counter>0) Publish();
 }
 */
-
-function Publish()
-{	
-	var resp = VKMethod("wall.post","attachments=" + attachments)
-	
-	//echo(JSON.stringify(resp));
-	counter = 0;
-	attachments = "";
-
-}
-
-
-function VKMethod(method, args) {
-	
-	var addr = "https://api.vk.com/method/" + method + "?access_token=" + GetAccessToken() + "&" +args;
-				  
-	var resp = JSON.parse(httpGet(addr));
-   	
-	if ("response" in resp) return resp.response;
-    
-    var errcode = resp.error.error_code;
-     	
-   	switch(errcode)
-   	{
-   		case 5:
-   			//W.Echo "Authentication code needs to be updated"
-  
-   			var at=RenewAccessToken();
-   			if (typeof at!="undefined")
-   				return VKMethod(method, args);
-   			else {
-   				throw "Без доступа к методам программа ничего не может совершить.";
-   				return;
-   			}
-   			
-   		case 14:	//captcha 			
- 			captcha_img = resp.error.captcha_img;
- 			captcha_sid = resp.error.captcha_sid;
- 			
-   			wShell.Run (captcha_img);
-   			captcha_key = prompt("Captcha requested.");
-   			
-   			if (captcha_key==null) throw("Cannot proceed without captcha.");
-   			
-   			args = args + "&captcha_key=" +captcha_key+ "&captcha_sid="+captcha_sid;
-   			return VKMethod(method, args);
-   			
-   		default:
-   			echo("VKMethod",method,"error",errcode); 
-   			return resp.error;			
- 	}
- 	
-}
-
-
-var attachments, counter
-
-
-function GetAccessToken()
-{
-	if (!accessToken)
-	{
-		accessToken = RenewAccessToken()
-		//SaveSetting "accessToken", ,accessToken 
-	}
-	
-	GetAccessToken = accessToken
-}
-
-function RenewAccessToken()
-{
-	//'navigate browser to AuthUri
-	window.open(AuthUri);
-		
-	accessToken = InputBox("Введите access token (тоукен доступа)")
-	if (accessToken) //SaveSetting "accessToken", ,accessToken
-		
-	return accessToken
-}
 
 /*
 uploadExtensions="pdf djvu doc docx zip rar"
@@ -534,6 +576,11 @@ End Sub
 	*/
 
 </script>
+<script type="text/javascript">
+	VK.init({
+	  apiId: clientId
+	});
+  </script>
 </body>
 
 </html>
